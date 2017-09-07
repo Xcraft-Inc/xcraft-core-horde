@@ -36,15 +36,15 @@ exports.xcraftCommands = function () {
       'slave.add': {
         parallel: true,
         desc: 'add a slave in the Horde',
+      },
+      'slave.remove': {
+        parallel: true,
+        desc: 'remove a slave from the Horde',
         options: {
           params: {
             required: 'pid',
           },
         },
-      },
-      'slave.remove': {
-        parallel: true,
-        desc: 'remove a slave from the Horde',
       },
     },
   };
