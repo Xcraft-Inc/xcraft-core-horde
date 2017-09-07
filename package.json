@@ -1,0 +1,40 @@
+{
+  "name": "xcraft-core-horde",
+  "version": "2.1.0",
+  "description": "Xcraft Horde master",
+  "main": "lib/index.js",
+  "engines": {
+    "node": ">=6"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "xcraft",
+    "horde",
+    "master"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xcraft-Inc/xcraft-core-horde.git"
+  },
+  "config": {
+    "xcraft": {
+      "commands": true
+    }
+  },
+  "dependencies": {
+    "xcraft-core-busclient": "^2.0.0",
+    "xcraft-core-log": "^1.0.0",
+    "xcraft-core-utils": "^1.1.0"
+  },
+  "author": "Mathieu Schroeter",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Xcraft-Inc/xcraft-core-horde/issues"
+  },
+  "homepage": "https://github.com/Xcraft-Inc/xcraft-core-horde#readme",
+  "devDependencies": {
+    "xcraft-dev-rules": "^0.1.5"
+  }
+}
