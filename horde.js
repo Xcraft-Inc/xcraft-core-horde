@@ -2,11 +2,11 @@
 
 const cmd = {};
 
-cmd['slave.add'] = function (msg, resp) {
+cmd['slave.add'] = function* (msg, resp) {
   const horde = require ('.');
 
   try {
-    horde.add (resp);
+    yield horde.add (resp);
     resp.events.send (`horde.slave.add.${msg.id}.finished`);
   } catch (ex) {
     resp.events.send (`horde.slave.add.${msg.id}.error`);
