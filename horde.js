@@ -9,7 +9,7 @@ cmd['slave.add'] = function* (msg, resp) {
     yield horde.add (resp);
     resp.events.send (`horde.slave.add.${msg.id}.finished`);
   } catch (ex) {
-    resp.events.send (`horde.slave.add.${msg.id}.error`);
+    resp.events.send (`horde.slave.add.${msg.id}.error`, ex.stack || ex);
   }
 };
 
@@ -20,7 +20,7 @@ cmd['slave.remove'] = function (msg, resp) {
     horde.remove (msg.data.pid, resp);
     resp.events.send (`horde.slave.remove.${msg.id}.finished`);
   } catch (ex) {
-    resp.events.send (`horde.slave.remove.${msg.id}.error`);
+    resp.events.send (`horde.slave.remove.${msg.id}.error`, ex.stack || ex);
   }
 };
 
