@@ -2,11 +2,22 @@
 
 const cmd = {};
 
+cmd['_postload'] = function* (msg, resp) {
+  const horde = require ('.');
+
+  try {
+    yield horde.autoload (resp);
+    resp.events.send (`horde._postload.${msg.id}.finished`);
+  } catch (ex) {
+    resp.events.send (`horde._postload.${msg.id}.error`, ex.stack || ex);
+  }
+};
+
 cmd['slave.add'] = function* (msg, resp) {
   const horde = require ('.');
 
   try {
-    yield horde.add (resp);
+    yield horde.add (resp, null);
     resp.events.send (`horde.slave.add.${msg.id}.finished`);
   } catch (ex) {
     resp.events.send (`horde.slave.add.${msg.id}.error`, ex.stack || ex);
