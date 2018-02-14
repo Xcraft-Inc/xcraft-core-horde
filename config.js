@@ -10,4 +10,10 @@ module.exports = [
     message: 'autoloaded hordes',
     default: [],
   },
+  {
+    type: 'input',
+    name: 'topology',
+    message: 'topology settings JSON',
+    default: '',
+  },
 ];
