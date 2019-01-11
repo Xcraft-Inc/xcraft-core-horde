@@ -17,6 +17,22 @@ cmd['_postload'] = function*(msg, resp) {
   }
 };
 
+cmd['reload'] = function*(msg, resp) {
+  const horde = require('.');
+
+  try {
+    yield horde.unload(resp);
+    yield horde.autoload(resp, msg.data.topology);
+    resp.events.send(`horde.reload.${msg.id}.finished`);
+  } catch (ex) {
+    resp.events.send(`horde.reload.${msg.id}.error`, {
+      code: ex.code,
+      message: ex.message,
+      stack: ex.stack,
+    });
+  }
+};
+
 cmd['slave.add'] = function*(msg, resp) {
   const horde = require('.');
 
@@ -56,6 +72,10 @@ exports.xcraftCommands = function() {
   return {
     handlers: cmd,
     rc: {
+      reload: {
+        parallel: true,
+        desc: 'reload the hordes',
+      },
       'slave.add': {
         parallel: true,
         desc: 'add a slave in the Horde',
