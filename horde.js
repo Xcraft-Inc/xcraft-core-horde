@@ -17,6 +17,16 @@ cmd['_postload'] = function*(msg, resp) {
   }
 };
 
+cmd['use-topology'] = function(msg, resp) {
+  const horde = require('.');
+  const {topology} = msg.data;
+
+  resp.events.send(
+    `horde.use-topology.${msg.id}.finished`,
+    horde.useTopology(topology)
+  );
+};
+
 cmd['reload'] = function*(msg, resp) {
   const horde = require('.');
 
@@ -72,6 +82,15 @@ exports.xcraftCommands = function() {
   return {
     handlers: cmd,
     rc: {
+      'use-topology': {
+        parallel: true,
+        desc: 'check if the specified topology is used by the horde',
+        options: {
+          params: {
+            required: 'topology',
+          },
+        },
+      },
       reload: {
         parallel: true,
         desc: 'reload the hordes',
