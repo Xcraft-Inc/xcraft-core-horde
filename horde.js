@@ -27,7 +27,7 @@ cmd['use-topology'] = function(msg, resp) {
   );
 };
 
-cmd['reload'] = function*(msg, resp) {
+cmd.reload = function*(msg, resp) {
   const horde = require('.');
   const {topology} = msg.data;
 
@@ -39,8 +39,8 @@ cmd['reload'] = function*(msg, resp) {
 
   try {
     yield horde.unload(resp);
-    yield horde.autoload(resp, msg.data.topology);
-    resp.events.send(`horde.reload.${msg.id}.finished`);
+    yield horde.autoload(resp, topology);
+    resp.events.send(`horde.reload.${msg.id}.finished`, true);
   } catch (ex) {
     resp.events.send(`horde.reload.${msg.id}.error`, {
       code: ex.code,
