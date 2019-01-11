@@ -29,6 +29,13 @@ cmd['use-topology'] = function(msg, resp) {
 
 cmd['reload'] = function*(msg, resp) {
   const horde = require('.');
+  const {topology} = msg.data;
+
+  if (!horde.useTopology(topology)) {
+    resp.log.err(`the topology "${topology}" is not defined, skip reload`);
+    resp.events.send(`horde.reload.${msg.id}.finished`, false);
+    return;
+  }
 
   try {
     yield horde.unload(resp);
