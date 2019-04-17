@@ -29,6 +29,21 @@ cmd['use-topology'] = function(msg, resp) {
   );
 };
 
+cmd.load = function*(msg, resp) {
+  const horde = require('.');
+
+  try {
+    yield horde.autoload(resp);
+    resp.events.send(`horde.load.${msg.id}.finished`, true);
+  } catch (ex) {
+    resp.events.send(`horde.load.${msg.id}.error`, {
+      code: ex.code,
+      message: ex.message,
+      stack: ex.stack,
+    });
+  }
+};
+
 cmd.reload = function*(msg, resp) {
   const horde = require('.');
   const {topology} = msg.data;
@@ -99,6 +114,10 @@ exports.xcraftCommands = function() {
             required: 'topology',
           },
         },
+      },
+      load: {
+        parallel: true,
+        desc: 'load the hordes',
       },
       reload: {
         parallel: true,
