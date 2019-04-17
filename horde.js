@@ -6,7 +6,9 @@ cmd['_postload'] = function*(msg, resp) {
   const horde = require('.');
 
   try {
-    yield horde.autoload(resp);
+    if (horde.config.autoload) {
+      yield horde.autoload(resp);
+    }
     resp.events.send(`horde._postload.${msg.id}.finished`);
   } catch (ex) {
     resp.events.send(`horde._postload.${msg.id}.error`, {

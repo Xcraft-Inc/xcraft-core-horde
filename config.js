@@ -16,4 +16,10 @@ module.exports = [
     message: 'topology settings JSON',
     default: '',
   },
+  {
+    type: 'confirm',
+    name: 'autoload',
+    message: 'load automatically the topology',
+    default: true,
+  },
 ];
