@@ -31,7 +31,7 @@
     "xcraft-core-daemon": "^2.0.0",
     "xcraft-core-etc": "^1.2.0",
     "xcraft-core-host": "^1.0.0",
-    "xcraft-core-utils": "^1.1.0"
+    "xcraft-core-utils": "^2.0.0"
   },
   "author": "Mathieu Schroeter",
   "license": "MIT",
