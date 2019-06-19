@@ -115,11 +115,11 @@ exports.xcraftCommands = function() {
           },
         },
       },
-      load: {
+      'load': {
         parallel: true,
         desc: 'load the hordes',
       },
-      reload: {
+      'reload': {
         parallel: true,
         desc: 'reload the hordes',
       },
