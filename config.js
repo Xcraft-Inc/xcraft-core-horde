@@ -8,6 +8,7 @@ module.exports = [
     type: 'checkbox',
     name: 'hordes',
     message: 'autoloaded hordes',
+    choices: [],
     default: [],
   },
   {
