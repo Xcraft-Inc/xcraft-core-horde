@@ -2,7 +2,7 @@
 
 const cmd = {};
 
-cmd['_postload'] = function*(msg, resp) {
+cmd['_postload'] = function* (msg, resp) {
   const horde = require('.');
 
   try {
@@ -19,7 +19,7 @@ cmd['_postload'] = function*(msg, resp) {
   }
 };
 
-cmd['use-topology'] = function(msg, resp) {
+cmd['use-topology'] = function (msg, resp) {
   const horde = require('.');
   const {topology} = msg.data;
 
@@ -29,7 +29,7 @@ cmd['use-topology'] = function(msg, resp) {
   );
 };
 
-cmd.load = function*(msg, resp) {
+cmd.load = function* (msg, resp) {
   const horde = require('.');
 
   try {
@@ -44,7 +44,7 @@ cmd.load = function*(msg, resp) {
   }
 };
 
-cmd.reload = function*(msg, resp) {
+cmd.reload = function* (msg, resp) {
   const horde = require('.');
   const {topology} = msg.data;
 
@@ -67,7 +67,7 @@ cmd.reload = function*(msg, resp) {
   }
 };
 
-cmd['slave.add'] = function*(msg, resp) {
+cmd['slave.add'] = function* (msg, resp) {
   const horde = require('.');
 
   try {
@@ -82,7 +82,7 @@ cmd['slave.add'] = function*(msg, resp) {
   }
 };
 
-cmd['slave.remove'] = function(msg, resp) {
+cmd['slave.remove'] = function (msg, resp) {
   const horde = require('.');
 
   try {
@@ -102,7 +102,7 @@ cmd['slave.remove'] = function(msg, resp) {
  *
  * @returns {Object} The list and definitions of commands.
  */
-exports.xcraftCommands = function() {
+exports.xcraftCommands = function () {
   return {
     handlers: cmd,
     rc: {
