@@ -69,10 +69,10 @@ cmd.reload = function* (msg, resp) {
 
 cmd['slave.add'] = function* (msg, resp) {
   const horde = require('.');
-
+  const {appId} = msg.data;
   try {
-    yield horde.add(resp, null);
-    resp.events.send(`horde.slave.add.${msg.id}.finished`);
+    const slaveId = yield horde.add(resp, appId, null);
+    resp.events.send(`horde.slave.add.${msg.id}.finished`, {slaveId});
   } catch (ex) {
     resp.events.send(`horde.slave.add.${msg.id}.error`, {
       code: ex.code,
@@ -86,7 +86,7 @@ cmd['slave.remove'] = function (msg, resp) {
   const horde = require('.');
 
   try {
-    horde.remove(msg.data.pid, resp);
+    horde.remove(msg.data.slaveId, resp);
     resp.events.send(`horde.slave.remove.${msg.id}.finished`);
   } catch (ex) {
     resp.events.send(`horde.slave.remove.${msg.id}.error`, {
