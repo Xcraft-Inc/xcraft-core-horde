@@ -2,23 +2,6 @@
 
 const cmd = {};
 
-cmd['_postload'] = function* (msg, resp) {
-  const horde = require('.');
-
-  try {
-    if (horde.config.autoload) {
-      yield horde.autoload(resp);
-    }
-    resp.events.send(`horde._postload.${msg.id}.finished`);
-  } catch (ex) {
-    resp.events.send(`horde._postload.${msg.id}.error`, {
-      code: ex.code,
-      message: ex.message,
-      stack: ex.stack,
-    });
-  }
-};
-
 cmd['use-topology'] = function (msg, resp) {
   const horde = require('.');
   const {topology} = msg.data;
