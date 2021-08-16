@@ -2,16 +2,6 @@
 
 const cmd = {};
 
-cmd['use-topology'] = function (msg, resp) {
-  const horde = require('.');
-  const {topology} = msg.data;
-
-  resp.events.send(
-    `horde.use-topology.${msg.id}.finished`,
-    horde.useTopology(topology)
-  );
-};
-
 cmd.load = function* (msg, resp) {
   const horde = require('.');
 
@@ -29,17 +19,10 @@ cmd.load = function* (msg, resp) {
 
 cmd.reload = function* (msg, resp) {
   const horde = require('.');
-  const {topology} = msg.data;
-
-  if (!horde.useTopology(topology)) {
-    resp.log.err(`the topology "${topology}" is not defined, skip reload`);
-    resp.events.send(`horde.reload.${msg.id}.finished`, false);
-    return;
-  }
 
   try {
     yield horde.unload(resp);
-    yield horde.autoload(resp, topology);
+    yield horde.autoload(resp);
     resp.events.send(`horde.reload.${msg.id}.finished`, true);
   } catch (ex) {
     resp.events.send(`horde.reload.${msg.id}.error`, {
@@ -89,15 +72,6 @@ exports.xcraftCommands = function () {
   return {
     handlers: cmd,
     rc: {
-      'use-topology': {
-        parallel: true,
-        desc: 'check if the specified topology is used by the horde',
-        options: {
-          params: {
-            required: 'topology',
-          },
-        },
-      },
       'load': {
         parallel: true,
         desc: 'load the hordes',
