@@ -26,12 +26,12 @@
   "dependencies": {
     "gigawatts": "^4.0.1",
     "uuid": "^8.3.2",
-    "xcraft-core-bus": "^4.0.0",
-    "xcraft-core-busclient": "^4.0.0",
-    "xcraft-core-daemon": "^2.1.2",
-    "xcraft-core-etc": "^2.0.4",
-    "xcraft-core-host": "^2.2.0",
-    "xcraft-core-utils": "^3.0.0"
+    "xcraft-core-bus": "^5.0.0",
+    "xcraft-core-busclient": "^5.0.0",
+    "xcraft-core-daemon": "^3.0.0",
+    "xcraft-core-etc": "^3.0.0",
+    "xcraft-core-host": "^3.0.0",
+    "xcraft-core-utils": "^4.0.0"
   },
   "author": "Mathieu Schroeter",
   "license": "MIT",
