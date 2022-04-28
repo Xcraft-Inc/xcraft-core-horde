@@ -32,6 +32,7 @@
     "xcraft-core-etc": "^3.0.0",
     "xcraft-core-host": "^3.0.0",
     "xcraft-core-transport": "^4.0.0",
+    "xcraft-core-utils": "^4.2.0",
     "xcraft-server": "^5.0.0"
   },
   "author": "Mathieu Schroeter",
