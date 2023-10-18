@@ -23,4 +23,10 @@ module.exports = [
     message: 'load automatically the topology',
     default: true,
   },
+  {
+    type: 'confirm',
+    name: 'connection.useOverlay',
+    message: 'Enable overlay on disconnection',
+    default: true,
+  },
 ];
