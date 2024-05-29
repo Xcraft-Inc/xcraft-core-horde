@@ -13,6 +13,12 @@ module.exports = [
   },
   {
     type: 'input',
+    name: 'gatekeeper',
+    message: 'gatekeeper url',
+    default: '',
+  },
+  {
+    type: 'input',
     name: 'topology',
     message: 'topology settings JSON',
     default: '',
