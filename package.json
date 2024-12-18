@@ -1,6 +1,6 @@
 {
   "name": "xcraft-core-horde",
-  "version": "3.5.5",
+  "version": "3.5.6",
   "description": "Xcraft Horde master",
   "main": "lib/index.js",
   "engines": {
