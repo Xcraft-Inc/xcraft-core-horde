@@ -35,7 +35,12 @@
     "xcraft-core-utils": "^4.2.0",
     "xcraft-server": "^5.0.0"
   },
-  "author": "Mathieu Schroeter",
+  "author": "Epsitec SA",
+  "contributors": [
+    "Mathieu Schroeter <schroeter@epsitec.ch>",
+    "Samuel Loup <loup@epsitec.ch>",
+    "Gillian Fries <fries@epsitec.ch>"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Xcraft-Inc/xcraft-core-horde/issues"
