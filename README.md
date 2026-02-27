@@ -1,70 +1,88 @@
-# 📘 Documentation du module xcraft-core-horde
+# 📘 xcraft-core-horde
 
 ## Aperçu
 
 Le module `xcraft-core-horde` est un composant central de l'écosystème Xcraft qui gère la communication et la coordination entre plusieurs instances d'applications (appelées "hordes"). Il permet de créer une architecture distribuée où plusieurs processus (esclaves ou "slaves") peuvent communiquer entre eux, formant ainsi un système cohérent et résilient.
 
-Une horde est un nœud serveur où des services sont déployés. Une horde peut avoir des sous-hordes, créant ainsi un graphe de serveurs où les commandes et événements peuvent être échangés selon des règles définies. Tous les nœuds (serveurs comme clients) sont des hordes. Lorsqu'un "client" se connecte à un serveur principal, c'est simplement parce que dans ses paramètres de horde, une sous-horde est spécifiée.
+Une horde est un nœud serveur où des services sont déployés. Une horde peut avoir des sous-hordes, créant ainsi un graphe de serveurs où les commandes et événements peuvent être échangés selon des règles définies. Lorsqu'un "client" se connecte à un serveur principal, c'est simplement parce que dans ses paramètres de horde, une sous-horde est spécifiée.
 
 ## Sommaire
 
 - [Aperçu](#aperçu)
 - [Structure du module](#structure-du-module)
 - [Fonctionnement global](#fonctionnement-global)
-  - [Concept de Horde et Tribus](#concept-de-horde-et-tribus)
-  - [Communication entre esclaves](#communication-entre-esclaves)
-  - [Surveillance et résilience](#surveillance-et-résilience)
 - [Exemples d'utilisation](#exemples-dutilisation)
 - [Interactions avec d'autres modules](#interactions-avec-dautres-modules)
 - [Configuration avancée](#configuration-avancée)
 - [Détails des sources](#détails-des-sources)
-- [API Reference](#api-reference)
+- [Licence](#licence)
 
 ## Structure du module
 
 Le module s'organise autour de deux classes principales :
 
-- **Slave** : Représente une instance d'application connectée à la horde. Chaque esclave peut être un processus distinct avec sa propre configuration.
-- **Horde** : Gère l'ensemble des esclaves, leur cycle de vie et la communication entre eux.
+- **`Slave`** : Représente une instance d'application connectée à la horde. Chaque esclave peut être un processus distinct avec sa propre configuration de bus et sa clé de routage.
+- **`Horde`** : Gère l'ensemble des esclaves, leur cycle de vie, la topologie et la communication entre eux.
 
-Le module expose également des commandes Xcraft permettant de manipuler la horde depuis l'extérieur.
+Le module expose également des commandes Xcraft (via `horde.js`) permettant de manipuler la horde depuis le bus.
 
 ## Fonctionnement global
 
 ### Concept de Horde et Tribus
 
-Dans l'architecture Xcraft, une "horde" représente un ensemble d'applications qui collaborent. Chaque application peut être divisée en "tribus" (tribes), qui sont des instances distinctes partageant le même code mais avec des configurations différentes.
+Dans l'architecture Xcraft, une "horde" représente un ensemble d'applications qui collaborent. Chaque application peut être divisée en "tribus" (tribes), qui sont des instances distinctes partageant le même code mais avec des configurations de bus différentes (ports distincts).
+
+La clé de routage d'un esclave suit le pattern `{hordeId}` pour la tribu principale (0) ou `{hordeId}-{tribe}` pour les tribus numérotées.
 
 Le système permet de :
 
-- Démarrer et arrêter des esclaves dynamiquement
-- Connecter des esclaves existants
-- Diffuser des messages entre les esclaves
-- Surveiller l'état de santé des connexions
+- Démarrer de nouveaux processus esclaves via `xcraft-core-daemon`
+- Connecter des esclaves existants via leur configuration de bus
+- Diffuser des messages entre les esclaves (broadcast, fwcast, unicast)
+- Surveiller l'état de santé et la latence des connexions
 
 ### Communication entre esclaves
 
-La communication entre les esclaves est assurée par un système de bus basé sur `xcraft-core-bus` et `xcraft-core-transport`. Trois modes de communication sont disponibles :
+La communication est assurée par `xcraft-core-bus` et `xcraft-core-transport`. Trois modes sont disponibles :
 
-1. **Broadcast** : Envoie un message à tous les esclaves (sauf l'émetteur)
-2. **Fwcast** (Forward cast) : Transmet un message à un esclave spécifique selon une clé de routage
-3. **Unicast** : Envoie un message à un esclave spécifique en fonction d'un "orcName"
+1. **Broadcast** : Envoie un message à tous les esclaves (sauf l'émetteur). Gère également le routage par ligne si le topic le spécifie.
+2. **Fwcast** (Forward cast) : Transmet un message à un esclave spécifique identifié par sa clé de routage.
+3. **Unicast** : Envoie un message à un esclave spécifique via le routeur axon associé à un `orcName`.
+
+Le mode `noForwarding` permet à un esclave de ne pas agir comme proxy : les messages ne sont pas automatiquement réacheminés, mais des informations de forwarding sont ajoutées pour permettre un routage explicite.
+
+Le mode `passive` restreint la transmission aux seuls événements de commandes (`.finished`, `.error`), aux événements `.orcished` et aux appels RPC.
 
 ### Surveillance et résilience
 
-Le module intègre un système de surveillance qui détecte les latences et les déconnexions :
+Chaque esclave connecté fait l'objet d'une surveillance par intervalle d'une seconde mesurant la latence via `performance.now()` et `events.lastPerf()`. Des événements `greathall::<perf>` sont émis avec le payload suivant :
 
-- Mesure le temps de réponse entre les esclaves
-- Affiche des indicateurs de performance via l'événement `greathall::<perf>`
-- Peut afficher une interface de superposition (overlay) en cas de déconnexion
-- Tente de rétablir les connexions perdues
+```javascript
+{
+  horde: string,     // Identifiant de la horde
+  delta: number,     // Latence en millisecondes
+  lag: boolean,      // Présence de latence
+  overlay: boolean,  // Affichage de l'overlay demandé
+  noSocket: boolean, // Connexion perdue
+  reason: string     // Raison de l'erreur de connexion
+}
+```
 
-Le système utilise différents seuils de latence pour déclencher des actions appropriées :
+Les seuils déclencheurs sont les suivants :
 
-- Moins de 1000ms : Fonctionnement normal
-- Entre 1000ms et 10000ms : Indication de latence
-- Plus de 10000ms : Affichage d'un overlay (si configuré)
-- Plus de 20000ms : Destruction du socket pour préparer un redémarrage (sauf en mode développement ou avec `optimistLag`)
+- **< 1000 ms** : Fonctionnement normal ; l'événement est émis une seule fois lors du retour à la normale.
+- **1000–10 000 ms** : Latence signalée sans overlay.
+- **> 10 000 ms** : Latence critique avec overlay (si `connection.useOverlay` est activé).
+- **≥ 20 000 ms** (configurable via `setMaxLagDeltaTime`) : Destruction du socket push pour préparer une reconnexion, sauf en mode `development` ou avec l'option `optimistLag`.
+
+### Chargement de la topologie
+
+Lors de l'`autoload`, le module lit la liste des hordes configurées et, pour chacune :
+
+- Si la topologie définit des `tribes` pour cette horde, il utilise `_loadTribes` pour se connecter aux tribus existantes de l'application courante (en excluant la tribu courante).
+- Sinon, il utilise `_loadSingle` pour démarrer ou se connecter à la tribu principale (0) puis aux tribus supplémentaires déclarées dans la configuration de bus.
+
+La topologie peut aussi être surchargée au démarrage via l'argument `--topology` (JSON).
 
 ## Exemples d'utilisation
 
@@ -72,9 +90,7 @@ Le système utilise différents seuils de latence pour déclencher des actions a
 
 ```javascript
 const horde = require('xcraft-core-horde');
-const resp = /* objet de réponse Xcraft */;
-
-// Chargement automatique des hordes selon la configuration
+// resp est l'objet de réponse Xcraft disponible dans une quête ou commande
 await horde.autoload(resp);
 ```
 
@@ -82,9 +98,8 @@ await horde.autoload(resp);
 
 ```javascript
 const horde = require('xcraft-core-horde');
-const resp = /* objet de réponse Xcraft */;
 
-// Ajouter un esclave pour une application spécifique
+// Ajouter un esclave pour une application spécifique (démarre un nouveau processus)
 const slaveId = await horde.add(resp, 'myApp', null);
 console.log(`Nouvel esclave créé avec l'ID: ${slaveId}`);
 ```
@@ -94,281 +109,147 @@ console.log(`Nouvel esclave créé avec l'ID: ${slaveId}`);
 ```javascript
 const horde = require('xcraft-core-horde');
 
-// Diffuser un message à tous les esclaves
+// Diffuser à tous les esclaves (sauf l'émetteur)
 horde.broadcast('sourceSlaveId', 'mon.topic', {data: 'Hello world'});
 
-// Envoyer un message à un esclave spécifique
+// Transmettre à un esclave spécifique via sa clé de routage
 horde.fwcast('myApp-0', 'mon.topic', {data: 'Message ciblé'});
 
-// Envoyer un message à un esclave en fonction d'un orcName
-horde.unicast(
-  'mon.topic',
-  {data: 'Message pour un orc spécifique'},
-  'monOrcName'
-);
+// Envoyer via orcName
+horde.unicast('mon.topic', {data: 'Message pour un orc'}, 'monOrcName');
+```
+
+### Rechargement des hordes via le bus
+
+```javascript
+// Via le bus Xcraft (dans une quête Goblin)
+await this.quest.cmd('horde.reload');
 ```
 
 ## Interactions avec d'autres modules
 
-Le module `xcraft-core-horde` interagit étroitement avec plusieurs autres modules de l'écosystème Xcraft :
-
-- **[xcraft-core-bus]** : Pour la communication entre les processus
-- **[xcraft-core-transport]** : Pour le routage des messages
-- **[xcraft-core-etc]** : Pour la gestion de la configuration
-- **[xcraft-core-daemon]** : Pour la gestion des processus esclaves
-- **[xcraft-core-busclient]** : Pour la connexion aux bus
-- **[xcraft-core-host]** : Pour l'accès aux informations sur l'hôte
-- **[xcraft-server]** : Pour l'initialisation de l'environnement
+- **[xcraft-core-bus]** : Notification des changements de registre de commandes, de token et de reconnexion ; émission des événements de performance.
+- **[xcraft-core-busclient]** : Création des `BusClient` pour la connexion aux bus esclaves ; client global pour l'émission d'événements.
+- **[xcraft-core-transport]** : Routage unicast via les routeurs axon associés aux `orcName`.
+- **[xcraft-core-etc]** : Lecture de la configuration du module et des bus esclaves.
+- **[xcraft-core-daemon]** : Lancement des processus esclaves en tant que daemons.
+- **[xcraft-core-host]** : Accès aux informations d'application (`appId`, `variantId`, `appData`, `appConfigPath`).
+- **[xcraft-server]** : Initialisation de l'environnement (`initEtc`) pour les esclaves.
 
 ## Configuration avancée
 
-| Option                  | Description                                                            | Type          | Valeur par défaut |
-| ----------------------- | ---------------------------------------------------------------------- | ------------- | ----------------- |
-| `hordes`                | Liste des hordes à charger automatiquement                             | Array         | `[]`              |
-| `topology`              | Configuration de la topologie des hordes                               | String/Object | `''`              |
-| `autoload`              | Indique si la topologie doit être chargée automatiquement              | Boolean       | `true`            |
-| `connection.useOverlay` | Active/désactive l'affichage d'une superposition en cas de déconnexion | Boolean       | `true`            |
+| Option                  | Description                                                           | Type            | Valeur par défaut |
+| ----------------------- | --------------------------------------------------------------------- | --------------- | ----------------- |
+| `hordes`                | Liste des hordes à charger automatiquement                            | `Array`         | `[]`              |
+| `topology`              | Configuration JSON de la topologie des hordes (hôtes, ports, tribus…) | `String/Object` | `''`              |
+| `autoload`              | Charge automatiquement la topologie au démarrage                      | `Boolean`       | `true`            |
+| `connection.useOverlay` | Active l'affichage d'une superposition UI en cas de déconnexion       | `Boolean`       | `true`            |
 
 ### Variables d'environnement
 
-| Variable      | Description                                                       | Exemple         | Valeur par défaut |
-| ------------- | ----------------------------------------------------------------- | --------------- | ----------------- |
-| `NODE_ENV`    | Environnement d'exécution, affecte le comportement de reconnexion | `development`   | -                 |
-| `GOBLINS_APP` | Identifiant de l'application Goblins                              | `myApp@variant` | -                 |
+| Variable      | Description                                                                                    | Exemple         | Valeur par défaut |
+| ------------- | ---------------------------------------------------------------------------------------------- | --------------- | ----------------- |
+| `NODE_ENV`    | Environnement d'exécution ; désactive la destruction de socket en `development`                | `development`   | —                 |
+| `GOBLINS_APP` | Identifiant de l'application Goblins, utilisé lors du chargement de la config bus d'un esclave | `myApp@variant` | —                 |
 
 ## Détails des sources
 
-### `config.js`
-
-Définit la configuration du module via `xcraft-core-etc` avec les options suivantes :
-
-- Configuration des hordes à charger automatiquement
-- Paramètres de topologie
-- Options de connexion et d'overlay
-
 ### `horde.js`
 
-Définit les commandes Xcraft exposées par le module :
+Fichier de commandes Xcraft exposées sur le bus. Toutes les commandes sont déclarées en mode `parallel`.
 
-**`load`** - Charge les hordes configurées automatiquement. Émet un événement `horde.load.{id}.finished` en cas de succès ou `horde.load.{id}.error` en cas d'erreur.
-
-**`reload`** - Décharge puis recharge toutes les hordes. Combine les opérations `unload` et `autoload`.
-
-**`slave.add`** - Ajoute un esclave à la horde pour une application spécifique. Retourne l'ID de l'esclave créé.
-
-**`slave.remove`** - Supprime un esclave de la horde en utilisant son ID (PID).
+- **`horde.load`** — Déclenche `horde.autoload(resp)`. Émet `horde.load.{id}.finished` ou `horde.load.{id}.error`.
+- **`horde.reload`** — Exécute `horde.unload` puis `horde.autoload`. Émet `horde.reload.{id}.finished` ou `horde.reload.{id}.error`.
+- **`horde.slave.add`** — Ajoute un esclave pour l'`appId` fourni en paramètre. Retourne `{slaveId}` via `horde.slave.add.{id}.finished`.
+- **`horde.slave.remove`** — Supprime l'esclave identifié par `slaveId`. Paramètre requis : `pid`.
 
 ### `lib/index.js`
 
-Contient l'implémentation principale du module avec les classes `Slave` et `Horde`.
+Contient l'implémentation principale avec les classes `Slave` et `Horde`.
 
-## API Reference
+#### Classe `Slave`
 
-### Classe Slave
+Hérite d'`EventEmitter`. Représente un esclave, qu'il soit un processus démarré localement (via `xcraft-core-daemon`) ou une connexion vers un serveur distant.
 
-Représente un esclave dans la horde et hérite d'`EventEmitter`. Chaque esclave possède :
+##### Propriétés
 
-- Un identifiant unique (`_name` ou PID du processus)
-- Une clé de routage (`_routingKey`) basée sur l'ID de horde et la tribu
-- Un client bus pour la communication
-- Optionnellement un daemon pour les processus démarrés localement
+- **`id`** — PID du processus daemon ou UUID généré si pas de daemon.
+- **`horde`** — Identifiant de la horde (`hordeId`).
+- **`routingKey`** — Clé de routage : `{hordeId}` ou `{hordeId}-{tribe}`.
+- **`commands`** — Registre des commandes disponibles sur cet esclave.
+- **`busClient`** — Instance `BusClient` pour la communication.
+- **`isDaemon`** — `true` si l'esclave a été démarré via un daemon local.
+- **`isConnected`** — État de la connexion au bus.
+- **`isPassive`** — Mode passif (transmission restreinte).
+- **`noForwarding`** — Mode sans proxy automatique.
+- **`tribe`** — Numéro de tribu.
+- **`totalTribes`** — Nombre total de tribus (setter).
+- **`lastErrorReason`** — Dernière raison d'erreur de connexion.
 
-#### Propriétés
+##### Méthodes publiques
 
-| Propriété        | Type      | Description                                                    |
-| ---------------- | --------- | -------------------------------------------------------------- |
-| `id`             | `string`  | Retourne le PID du processus ou l'UUID si pas de daemon       |
-| `horde`          | `string`  | Identifiant de la horde                                        |
-| `routingKey`     | `string`  | Clé de routage pour identifier l'esclave                       |
-| `commands`       | `object`  | Registre des commandes disponibles                             |
-| `busClient`      | `object`  | Client de bus pour la communication                            |
-| `isDaemon`       | `boolean` | Indique si l'esclave est un processus daemon                   |
-| `isConnected`    | `boolean` | État de la connexion au bus                                    |
-| `isPassive`      | `boolean` | Mode passif (ne transmet que certains événements)             |
-| `noForwarding`   | `boolean` | Mode sans transfert automatique                                |
-| `tribe`          | `number`  | Numéro de la tribu                                             |
-| `totalTribes`    | `number`  | Nombre total de tribus configurées                             |
-| `lastErrorReason`| `string`  | Dernière raison d'erreur de connexion                          |
+- **`connect(busConfig)`** — Connecte l'esclave à un bus existant. Configure le `BusClient`, les handlers d'événements et le proxy `catchAll` pour le transfert des messages vers la horde. Les messages de commande (`.finished`, `.error`) et les événements orcishés sont routés en unicast ou fwcast avant un éventuel broadcast.
 
-#### Méthodes
+- **`start()`** — Démarre un nouveau processus esclave via `xcraft-core-daemon` avec les arguments `--app` et `--tribe`. Tente de lire la configuration du bus toutes les 5 secondes (jusqu'à 10 tentatives) avant d'appeler `connect`.
 
-**`connect(busConfig)`**
-- **Description** : Connecte l'esclave à un bus existant
-- **Paramètres** :
-  - `busConfig` (object) : Configuration du bus
-- **Retour** : Promise
-- **Usage** : Configure le client bus et établit les gestionnaires d'événements pour le transfert des messages
+- **`stop(shutdown)`** — Arrête l'esclave. Si `shutdown` est `true`, envoie la commande `shutdown` au serveur et arrête le daemon le cas échéant.
 
-**`start()`**
-- **Description** : Démarre un nouveau processus esclave
-- **Retour** : Promise
-- **Usage** : Utilise `xcraft-core-daemon` pour créer un nouveau processus avec les paramètres d'application et de tribu
+- **`busConfig(pid)`** — Génère la configuration de bus pour un PID donné en initialisant l'environnement `xcraft-core-etc` avec le bon chemin d'application et de variante.
 
-**`stop(shutdown)`**
-- **Description** : Arrête l'esclave de manière gracieuse
-- **Paramètres** :
-  - `shutdown` (boolean) : Si true, envoie une commande d'arrêt au serveur
-- **Retour** : Promise
+##### Événements émis
 
-**`busConfig(pid)`**
-- **Description** : Génère la configuration du bus pour un processus donné
-- **Paramètres** :
-  - `pid` (string|number) : Identifiant du processus
-- **Retour** : object - Configuration du bus
-- **Usage** : Utilise les paramètres de l'application et de la tribu pour générer la config
+- **`commands.registry`** — Mise à jour du registre de commandes.
+- **`token.changed`** — Changement de token d'authentification.
+- **`orcname.changed`** — Changement d'orcName.
+- **`reconnect`** — Reconnexion réussie.
+- **`reconnect attempt`** — Tentative de reconnexion en cours.
 
-#### Événements
+#### Classe `Horde`
 
-| Événement           | Description                                    |
-| ------------------- | ---------------------------------------------- |
-| `commands.registry` | Émis lors de la mise à jour du registre       |
-| `token.changed`     | Émis lors du changement de token               |
-| `orcname.changed`   | Émis lors du changement d'orcName              |
-| `reconnect`         | Émis lors d'une reconnexion réussie            |
-| `reconnect attempt` | Émis lors d'une tentative de reconnexion      |
+Gère l'ensemble des esclaves via une `Map` (`_slaves`) et les intervalles de surveillance (`_deltaInterval`).
 
-### Classe Horde
+##### Propriétés
 
-Gère l'ensemble des esclaves et leur communication. Utilise une `Map` pour stocker les esclaves et gère la topologie des connexions.
+- **`routingKey`** — Clé de routage de la horde courante.
+- **`commands`** — Registre complet de tous les esclaves (y compris `noForwarding`).
+- **`public`** — Registre des seuls esclaves sans `noForwarding`.
+- **`config`** — Configuration chargée depuis `xcraft-core-etc`.
+- **`isTribeDispatcher`** — `true` si cette horde gère la distribution des tribus pour son propre `appId`.
+- **`busClient`** — Objet exposant `command.send(routingKey, cmd, msg)` pour envoyer une commande vers un esclave spécifique avec enrichissement du message (ARP, route, nice).
 
-#### Propriétés
+##### Méthodes publiques
 
-| Propriété           | Type      | Description                                                    |
-| ------------------- | --------- | -------------------------------------------------------------- |
-| `routingKey`        | `string`  | Clé de routage de la horde principale                          |
-| `commands`          | `object`  | Registre complet des commandes de tous les esclaves           |
-| `public`            | `object`  | Registre des commandes publiques (esclaves sans noForwarding) |
-| `config`            | `object`  | Configuration de la horde                                      |
-| `isTribeDispatcher` | `boolean` | Indique si cette horde gère la distribution des tribus        |
-| `busClient`         | `object`  | Interface de client bus pour l'envoi de commandes             |
+- **`setMaxLagDeltaTime(delta=20000)`** — Définit le seuil de latence (ms) au-delà duquel le socket push est détruit pour forcer une reconnexion.
 
-#### Méthodes
+- **`autoload(resp)`** — Charge toutes les hordes configurées selon leur topologie (tribus ou mode simple).
 
-**`autoload(resp)`**
-- **Description** : Charge automatiquement toutes les hordes configurées
-- **Paramètres** :
-  - `resp` (object) : Objet de réponse Xcraft
-- **Retour** : Promise
-- **Usage** : Gère les hordes simples et celles avec tribus multiples selon la topologie
+- **`add(slave, horde, busConfig)`** — Ajoute un esclave. Si `busConfig` est fourni, connecte l'esclave ; sinon le démarre. Configure la surveillance des performances par intervalle d'une seconde.
 
-**`add(slave, horde, busConfig)`**
-- **Description** : Ajoute un esclave à la horde
-- **Paramètres** :
-  - `slave` (Slave|object) : Instance Slave ou objet de réponse
-  - `horde` (string) : Identifiant de la horde
-  - `busConfig` (object) : Configuration du bus (optionnel)
-- **Retour** : Promise<string> - ID de l'esclave créé
-- **Usage** : Configure la surveillance des performances et établit les connexions
+- **`remove(id, resp)`** — Supprime un esclave : nettoie l'intervalle de surveillance, les listeners et appelle `stop(false)`.
 
-**`remove(id, resp)`**
-- **Description** : Supprime un esclave de la horde
-- **Paramètres** :
-  - `id` (string) : Identifiant de l'esclave
-  - `resp` (object) : Objet de réponse Xcraft
-- **Retour** : Promise
-- **Usage** : Nettoie les ressources et supprime l'esclave de la collection
+- **`broadcast(hordeId, topic, msg)`** — Diffuse un message à tous les esclaves sauf l'émetteur, avec routage par ligne si applicable.
 
-**`broadcast(hordeId, topic, msg)`**
-- **Description** : Diffuse un message à tous les esclaves sauf l'émetteur
-- **Paramètres** :
-  - `hordeId` (string) : ID de la horde émettrice
-  - `topic` (string) : Sujet du message
-  - `msg` (object) : Contenu du message
-- **Usage** : Gère le routage par ligne si spécifié dans le topic
+- **`fwcast(routingKey, topic, msg)`** — Transmet un message à l'esclave correspondant à la clé de routage. Retourne `true` en cas de succès.
 
-**`fwcast(routingKey, topic, msg)`**
-- **Description** : Transmet un message à un esclave spécifique
-- **Paramètres** :
-  - `routingKey` (string) : Clé de routage de l'esclave cible
-  - `topic` (string) : Sujet du message
-  - `msg` (object) : Contenu du message
-- **Retour** : boolean - True si le message a été envoyé
+- **`unicast(topic, msg, orcName?)`** — Envoie un message via le routeur axon associé à l'`orcName`. Retourne `true` en cas de succès.
 
-**`unicast(topic, msg, orcName)`**
-- **Description** : Envoie un message à un esclave spécifique par orcName
-- **Paramètres** :
-  - `topic` (string) : Sujet du message
-  - `msg` (object) : Contenu du message
-  - `orcName` (string) : Nom de l'orc cible (optionnel, utilise msg.orcName si absent)
-- **Retour** : boolean - True si le message a été envoyé
+- **`stop(all)`** — Arrête tous les esclaves. Si `all` est `true` ou si l'esclave est un daemon, envoie la commande de shutdown.
 
-**`stop(all)`**
-- **Description** : Arrête tous les esclaves
-- **Paramètres** :
-  - `all` (boolean) : Si true, envoie des commandes d'arrêt aux serveurs
-- **Retour** : Promise
+- **`unload(resp)`** — Décharge tous les esclaves en appelant `remove` pour chacun.
 
-**`unload(resp)`**
-- **Description** : Décharge tous les esclaves de la horde
-- **Paramètres** :
-  - `resp` (object) : Objet de réponse Xcraft
-- **Retour** : Promise
+- **`getSlaves()`** — Retourne la liste des clés de routage de tous les esclaves actifs.
 
-**`getSlaves()`**
-- **Description** : Retourne la liste des clés de routage des esclaves
-- **Retour** : Array<string> - Liste des clés de routage
+- **`getTribe(routingKey)`** — Retourne le numéro de tribu associé à une clé de routage, ou `-1` si non trouvé.
 
-**`getTribe(routingKey)`**
-- **Description** : Retourne le numéro de tribu pour une clé de routage
-- **Paramètres** :
-  - `routingKey` (string) : Clé de routage
-- **Retour** : number - Numéro de tribu ou -1 si non trouvé
+- **`getSlave(routingKey)`** — Retourne l'instance `Slave` associée à une clé de routage, ou `-1` si non trouvée.
 
-**`getSlave(routingKey)`**
-- **Description** : Retourne l'instance Slave pour une clé de routage
-- **Paramètres** :
-  - `routingKey` (string) : Clé de routage
-- **Retour** : Slave|number - Instance Slave ou -1 si non trouvé
+- **`isNoForwarding(hordeId)`** — Retourne `true` si l'esclave de la horde spécifiée est en mode `noForwarding`.
 
-**`isNoForwarding(hordeId)`**
-- **Description** : Vérifie si une horde est en mode noForwarding
-- **Paramètres** :
-  - `hordeId` (string) : Identifiant de la horde
-- **Retour** : boolean|undefined
+Le module exporte une instance singleton de `Horde` (`module.exports = new Horde()`) ainsi que la classe `Horde` elle-même (`module.exports.Horde = Horde`).
 
-### Gestion des tribus
+## Licence
 
-Le module supporte deux modes de déploiement :
-
-1. **Mode simple** : Une horde avec une tribu principale (0) et optionnellement des tribus supplémentaires
-2. **Mode distribué** : Connexion à des tribus existantes selon la configuration de topologie
-
-La gestion des tribus permet de répartir la charge et d'organiser les services selon des critères métier.
-
-### Surveillance des performances
-
-Chaque esclave connecté fait l'objet d'une surveillance continue :
-
-- Mesure de la latence des communications
-- Détection des déconnexions
-- Émission d'événements `greathall::<perf>` pour l'interface utilisateur
-- Gestion automatique de la reconnexion en cas de problème
-
-Les événements `greathall::<perf>` contiennent les informations suivantes :
-
-```javascript
-{
-  horde: string,        // Identifiant de la horde
-  delta: number,        // Latence en millisecondes
-  lag: boolean,         // Indique si il y a de la latence
-  overlay: boolean,     // Indique si l'overlay doit être affiché
-  noSocket: boolean,    // Indique si la connexion est perdue
-  reason: string        // Raison de l'erreur de connexion
-}
-```
-
-### Commandes Xcraft exposées
-
-Le module expose les commandes suivantes sur le bus Xcraft :
-
-| Commande       | Description                                    | Paramètres requis |
-| -------------- | ---------------------------------------------- | ----------------- |
-| `horde.load`   | Charge les hordes configurées automatiquement | -                 |
-| `horde.reload` | Recharge toutes les hordes                     | -                 |
-| `horde.slave.add` | Ajoute un esclave à la horde                | `appId`           |
-| `horde.slave.remove` | Supprime un esclave de la horde          | `slaveId` (PID)   |
-
-_Cette documentation a été mise à jour automatiquement._
+Ce module est distribué sous [licence MIT](./LICENSE).
 
 [xcraft-core-bus]: https://github.com/Xcraft-Inc/xcraft-core-bus
 [xcraft-core-transport]: https://github.com/Xcraft-Inc/xcraft-core-transport
@@ -377,3 +258,5 @@ _Cette documentation a été mise à jour automatiquement._
 [xcraft-core-busclient]: https://github.com/Xcraft-Inc/xcraft-core-busclient
 [xcraft-core-host]: https://github.com/Xcraft-Inc/xcraft-core-host
 [xcraft-server]: https://github.com/Xcraft-Inc/xcraft-server
+
+_Ce contenu a été généré par IA_
