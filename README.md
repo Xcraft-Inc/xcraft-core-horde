@@ -24,7 +24,7 @@ Le module s'organise autour de deux classes principales :
 - **`Slave`** : Représente une instance d'application connectée à la horde. Chaque esclave peut être un processus distinct avec sa propre configuration de bus et sa clé de routage.
 - **`Horde`** : Gère l'ensemble des esclaves, leur cycle de vie, la topologie et la communication entre eux.
 
-Le module expose également des commandes Xcraft (via `horde.js`) permettant de manipuler la horde depuis le bus.
+Le module expose également des commandes Xcraft (via `horde.js`) permettant de manipuler la horde depuis le bus, ainsi qu'un utilitaire `OfflineChecker` (via `lib/offlineChecker.js`) permettant de surveiller la connectivité d'une horde spécifique depuis un acteur Goblin.
 
 ## Fonctionnement global
 
@@ -126,6 +126,21 @@ horde.unicast('mon.topic', {data: 'Message pour un orc'}, 'monOrcName');
 await this.quest.cmd('horde.reload');
 ```
 
+### Surveillance de la connectivité d'une horde
+
+```javascript
+const OfflineChecker = require('xcraft-core-horde/lib/offlineChecker.js');
+
+// Dans une quête Goblin, surveiller la connectivité de 'myApp'
+const checker = new OfflineChecker(quest, 'myApp', async (isConnected) => {
+  if (isConnected) {
+    console.log('myApp est de nouveau en ligne');
+  } else {
+    console.log('myApp est hors ligne');
+  }
+});
+```
+
 ## Interactions avec d'autres modules
 
 - **[xcraft-core-bus]** : Notification des changements de registre de commandes, de token et de reconnexion ; émission des événements de performance.
@@ -223,6 +238,8 @@ Gère l'ensemble des esclaves via une `Map` (`_slaves`) et les intervalles de su
 
 - **`autoload(resp)`** — Charge toutes les hordes configurées selon leur topologie (tribus ou mode simple).
 
+- **`waitAutoload(timeout=5000)`** — Attend la fin des connexions passives avec un timeout configurable. Retourne immédiatement si une erreur est détectée sur un esclave, évitant un délai inutile lorsque le serveur est inaccessible.
+
 - **`add(slave, horde, busConfig)`** — Ajoute un esclave. Si `busConfig` est fourni, connecte l'esclave ; sinon le démarre. Configure la surveillance des performances par intervalle d'une seconde.
 
 - **`remove(id, resp)`** — Supprime un esclave : nettoie l'intervalle de surveillance, les listeners et appelle `stop(false)`.
@@ -245,7 +262,21 @@ Gère l'ensemble des esclaves via une `Map` (`_slaves`) et les intervalles de su
 
 - **`isNoForwarding(hordeId)`** — Retourne `true` si l'esclave de la horde spécifiée est en mode `noForwarding`.
 
+- **`hasSyncing(hordeId)`** — Retourne `true` si la synchronisation est activée pour la horde spécifiée (absence de l'option `noSync` dans la topologie).
+
 Le module exporte une instance singleton de `Horde` (`module.exports = new Horde()`) ainsi que la classe `Horde` elle-même (`module.exports.Horde = Horde`).
+
+### `lib/offlineChecker.js`
+
+Utilitaire permettant de surveiller l'état de connectivité d'une horde spécifique depuis un acteur Goblin. Il souscrit à l'événement `greathall::<perf>` et invoque un callback asynchrone à chaque changement d'état de connexion (passage en ligne / hors ligne).
+
+#### Classe `OfflineChecker`
+
+##### Constructeur
+
+- **`constructor(quest, hordeId, callback)`** — Initialise le checker pour la horde `hordeId`. Le `callback` reçoit un booléen (`true` = connecté, `false` = déconnecté) et est appelé uniquement lors des transitions d'état. La souscription à l'événement de performance est automatiquement désinscrite via `quest.goblin.defer` à la destruction de l'acteur.
+
+La logique de détection repose sur le champ `noSocket` du payload `greathall::<perf>` : si `noSocket` est `true`, la horde est considérée hors ligne. Les événements `syncing` ou appartenant à une autre horde sont ignorés.
 
 ## Licence
 
